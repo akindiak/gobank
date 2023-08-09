@@ -11,11 +11,13 @@ import (
 
 type ApiServer struct {
 	listenAddr string
+	store      Storage
 }
 
-func NewApiServer(listenAddr string) *ApiServer {
+func NewApiServer(listenAddr string, store Storage) *ApiServer {
 	return &ApiServer{
 		listenAddr: listenAddr,
+		store:      store,
 	}
 }
 
@@ -45,12 +47,22 @@ func (s *ApiServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 
 func (s *ApiServer) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
-	
+
 	return WriteJSON(w, http.StatusOK, id)
 }
 
 func (s *ApiServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	createAccountRequest := &CreateAccountRequest{}
+	if err := json.NewDecoder(r.Body).Decode(createAccountRequest); err != nil {
+		return err
+	}
+
+	account := NewAccount(createAccountRequest.FirstName, createAccountRequest.LastName)
+	if err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusCreated, createAccountRequest)
 }
 
 func (s *ApiServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
