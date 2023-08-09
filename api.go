@@ -25,7 +25,7 @@ func (s *ApiServer) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/accounts", makeHandleFunc(s.handleAccount))
-	router.HandleFunc("/accounts/{id}", makeHandleFunc(s.handleGetAccount))
+	router.HandleFunc("/accounts/{id}", makeHandleFunc(s.handleGetAccountById))
 
 	log.Println("JSON API Server running on port", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
@@ -33,7 +33,7 @@ func (s *ApiServer) Run() {
 
 func (s *ApiServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
-		return s.handleGetAccount(w, r)
+		return s.handleGetAccounts(w, r)
 	}
 	if r.Method == "POST" {
 		return s.handleCreateAccount(w, r)
@@ -45,7 +45,15 @@ func (s *ApiServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
-func (s *ApiServer) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
+func (s *ApiServer) handleGetAccounts(w http.ResponseWriter, r *http.Request) error {
+	accounts, err := s.store.GetAccounts()
+	if err != nil {
+		return err
+	}
+	return WriteJSON(w, http.StatusOK, accounts)
+}
+
+func (s *ApiServer) handleGetAccountById(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
 
 	return WriteJSON(w, http.StatusOK, id)
@@ -85,7 +93,8 @@ func makeHandleFunc(f apiFunc) http.HandlerFunc {
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
-	w.WriteHeader(status)
 	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(status)
+
 	return json.NewEncoder(w).Encode(v)
 }
