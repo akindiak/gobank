@@ -27,6 +27,7 @@ func (s *ApiServer) Run() {
 
 	router.HandleFunc("/accounts", makeHandleFunc(s.handleAccount))
 	router.HandleFunc("/accounts/{id}", makeHandleFunc(s.handleAccountById))
+	router.HandleFunc("/transfer", makeHandleFunc(s.handleTrasfer))
 
 	log.Println("JSON API Server running on port", s.listenAddr)
 	http.ListenAndServe(s.listenAddr, router)
@@ -93,6 +94,28 @@ func (s *ApiServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 	}
 
 	return WriteJSON(w, http.StatusCreated, createAccountRequest)
+}
+
+func (s *ApiServer) handleTrasfer(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "POST" {
+		transferRequest := &TransferRequest{}
+		if err := json.NewDecoder(r.Body).Decode(transferRequest); err != nil {
+			return err
+		}
+		id, err := s.store.Transfer(transferRequest.AccountNumber, transferRequest.Amount)
+		if err != nil {
+			return WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
+		}
+		if id == 0 {
+			err = fmt.Errorf("account not %s not found", transferRequest.AccountNumber)
+			return WriteJSON(w, http.StatusNotFound, ApiError{Error: err.Error()})
+		}
+		return WriteJSON(w, http.StatusOK, map[string]any{
+			"transfered": transferRequest.Amount,
+			"to":         transferRequest.AccountNumber,
+		})
+	}
+	return fmt.Errorf("method %s not allowed", r.Method)
 }
 
 type ApiError struct {

@@ -13,8 +13,8 @@ type Storage interface {
 	GetAccounts() ([]*Account, error)
 	GetAccountByID(int) (*Account, error)
 	CreateAccount(*Account) error
-	UpdateAccount(*Account) error
 	DeleteAccount(int) (int, error)
+	Transfer(string, float64) (int, error)
 }
 
 type PostgresStore struct {
@@ -88,12 +88,24 @@ func (s *PostgresStore) CreateAccount(acc *Account) error {
 	return nil
 }
 
-func (s *PostgresStore) UpdateAccount(acc *Account) error {
-	return nil
-}
-
 func (s *PostgresStore) DeleteAccount(id int) (int, error) {
 	rows, err := s.db.Query("delete from accounts where id = $1 returning id", id)
+	for rows.Next() {
+		var id int
+		err := rows.Scan(&id)
+		return id, err
+	}
+	return 0, err
+}
+
+func (s *PostgresStore) Transfer(accountNumber string, amount float64) (int, error) {
+	query := `
+		update accounts
+		set balance = balance + $1
+		where number = $2
+		returning id;
+	`
+	rows, err := s.db.Query(query, amount, accountNumber)
 	for rows.Next() {
 		var id int
 		err := rows.Scan(&id)
