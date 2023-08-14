@@ -12,6 +12,7 @@ import (
 type Storage interface {
 	GetAccounts() ([]*Account, error)
 	GetAccountByID(int) (*Account, error)
+	GetAccountByNumber(string) (*Account, error)
 	CreateAccount(*Account) error
 	DeleteAccount(int) (int, error)
 	Transfer(string, float64) (int, error)
@@ -62,21 +63,33 @@ func (s *PostgresStore) GetAccountByID(id int) (*Account, error) {
 
 	for rows.Next() {
 		return scanIntoAccount(rows)
-
 	}
 	return nil, fmt.Errorf("account %d not found", id)
 }
 
+func (s *PostgresStore) GetAccountByNumber(number string) (*Account, error) {
+	rows, err := s.db.Query("select * from accounts where number = $1", number)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		return scanIntoAccount(rows)
+	}
+	return nil, fmt.Errorf("account %s not found", number)
+}
+
 func (s *PostgresStore) CreateAccount(acc *Account) error {
 	query := `
-		insert into accounts (first_name, last_name, number, balance, created_at)
-		values($1, $2, $3, $4, $5);`
+		insert into accounts (first_name, last_name, number, encrypted_password, balance, created_at)
+		values($1, $2, $3, $4, $5, $6);`
 
 	_, err := s.db.Query(
 		query,
 		acc.FirstName,
 		acc.LastName,
 		acc.Number,
+		acc.EncryptedPassword,
 		acc.Balance,
 		acc.CreatedAt,
 	)
@@ -125,7 +138,8 @@ func (s *PostgresStore) CreateAccountTable() error {
 			first_name varchar(255),
 			last_name varchar(255),
 			number varchar(255) not null,
-			balance double precision,
+			encrypted_password varchar(255),
+			balance int,
 			created_at timestamp
 		);`
 
@@ -140,6 +154,7 @@ func scanIntoAccount(rows *sql.Rows) (*Account, error) {
 		&acc.FirstName,
 		&acc.LastName,
 		&acc.Number,
+		&acc.EncryptedPassword,
 		&acc.Balance,
 		&acc.CreatedAt,
 	)
